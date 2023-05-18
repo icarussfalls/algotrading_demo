@@ -68,30 +68,6 @@ def gethourlydata_(symbol, interval, lookback):
     return frame
 
 
-
-def compute_ohlcv_changes(chunk):
-    ohlcv_changes = chunk[['Open', 'High', 'Low', 'Close', 'Volume']].diff()
-    ohlcv_changes.columns = ['O_change', 'H_change', 'L_change', 'C_change', 'V_change']
-    return ohlcv_changes
-
-
-def compute_ohlcv_stats(chunk, window):
-    ohlcv_stats = chunk.rolling(window=window).agg(['mean', 'std', 'skew', 'kurt'])
-    ohlcv_stats.columns = [f'{col}_{stat}' for col, stat in ohlcv_stats.columns]
-    return ohlcv_stats
-
-
-
-def compute_ohlcv_acf(chunk, window, lag):
-    ohlcv_acf = chunk.rolling(window=window)['C_change'].apply(lambda x: pd.Series(x).autocorr(lag))
-    ohlcv_acf.name = f'C_change_acorr_{lag}'
-    ohlcv_pacf = chunk.rolling(window=window)['C_change'].apply(lambda x: pacf(x, nlags=lag)[lag-1])
-    ohlcv_pacf.name = f'C_change_pacorr_{lag}'
-    return pd.concat([ohlcv_acf, ohlcv_pacf], axis=1)
-
-
-
-
 def get_precision(symbol):
     info = client.futures_exchange_info()
     for x in info['symbols']:
