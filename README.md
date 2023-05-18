@@ -8,3 +8,5 @@ To maintain a record of model predictions, the data is saved to a database every
 Furthermore, a trailing stop loss mechanism has been incorporated to account for instances when the market behaves irrationally. After the stop loss is triggered, a cooldown period of 15 minutes is enforced before new trades can be initiated.
 
 <img width="605" alt="Screenshot 2023-05-18 at 12 26 40 PM" src="https://github.com/icarussfalls/algotrading_demo/assets/109421980/372c8e94-e70c-41cb-890c-365456bb98c9">
+
+<img width="605" alt="Screenshot 2023-05-18 at 12 30 05 PM" src="https://github.com/icarussfalls/algotrading_demo/assets/109421980/b0fc229a-5c0f-4882-9cfa-87adb418dcf2">
