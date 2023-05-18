@@ -5,8 +5,7 @@ from strategy import *
 
 
 global pairs
-#pairs = ['ALGOUSDT', 'ALICEUSDT', 'BTCUSDT', 'ETHUSDT', 'MANAUSDT', 'NEOUSDT', 'OCEANUSDT', 'SANDUSDT', 'THETAUSDT', 'TRXUSDT', 'ZENUSDT']
-pairs = ['BTCUSDT']
+pairs = ['pair_name']
 active = True
 
 def trade(i):
