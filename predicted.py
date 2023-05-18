@@ -67,42 +67,7 @@ def get_precision(symbol):
             return x['quantityPrecision']
 
 def add_technical_indicators(df):
-    df = calculate_moving_average(df)
-    df.dropna(how='any', axis=0, inplace=True)
-    # Calculate RSI
-    df['rsi'] = ta.rsi(df['Close'], length=14)
-
-    # Calculate Bollinger Bands
-    bb = ta.bbands(df['Close'], length=20, std=2)
-    df['bb_upperband'] = bb['BBU_20_2.0']
-    df['bb_middleband'] = bb['BBM_20_2.0']
-    df['bb_lowerband'] = bb['BBL_20_2.0']
-
-    # Calculate EMA
-    df['ema_30'] = ta.ema(df['Close'], length=30)
-    df['ema_50'] = ta.ema(df['Close'], length=50)
-
-    # Calculate ADX
-    adx = ta.adx(df['High'], df['Low'], df['Close'], length=14)
-    df['adx'] = adx['ADX_14']
-    df['dmp'] = adx['DMP_14']
-    df['dmn'] = adx['DMN_14']
-
-    # Calculate MACD
-    macd = ta.macd(df['Close'], fast=12, slow=26, signal=9)
-    df['macd'] = macd['MACD_12_26_9']
-    df['macd_histogram'] = macd['MACDh_12_26_9']
-    df['macd_signal'] = macd['MACDs_12_26_9']
-    
-    df.fillna(method='ffill', inplace=True)
-    df = fill_missing_values(df)
-
-    # Apply differencing to numeric columns
-    numeric_cols = df.select_dtypes(include=np.number).columns
-    df[numeric_cols] = df[numeric_cols].diff()
-    
-    df.dropna(how='any', axis=0, inplace=True)
-    df = drop_zeros(df)
+#code to difference the cols and add technical indicators
     return df
 
 
@@ -119,13 +84,7 @@ def fill_missing_values(df):
 
 
 def normalize(dataset):
-    data = pd.DataFrame({})
-    data = dataset.copy()
-    data = add_technical_indicators(data)
-    data = data[-60:]
-    scaler_path = json_data.get('train_scaler_predicted')
-    scaler = load(scaler_path)
-    data_final = pd.DataFrame(scaler.transform(data), columns=data.columns, index=data.index)
+#normalize and scale the datas
     return data_final
 
 
@@ -178,7 +137,7 @@ class data():
         pred = ML(df.iloc[:, :], path_model).pred_values()
         scaler_path = json_data.get('train_scaler_predicted')
         scaler = load(scaler_path)
-        denormalized_pred = scaler.inverse_transform([[0, 0, 0, pred[0][0], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])[0][3]
+        denormalized_pred = #inverse the pred
         return denormalized_pred
     
     def returns(self):
@@ -225,17 +184,7 @@ class data():
 
 
     def observed_returns(self) -> Tuple[np.ndarray, np.ndarray]:
-        with sqlite3.connect('returns.db') as conn:
-            query = f"SELECT * FROM (SELECT * FROM predicted_returns ORDER BY id DESC LIMIT {self.window_size+1}) ORDER BY id ASC"
-            y_pred = np.array(pd.read_sql_query(query, conn)['return_value'])
-
-        # Calculate errors and rolling mean
-        df = gethourlydata(self.pair, '15m', '6days')
-        df = add_technical_indicators(df)
-        y_true = df['Close'].tail(self.window_size).values
-        # Replace NaN values with average
-        y_pred_avg = np.nanmean(y_pred)
-        y_pred_filled = np.where(np.isnan(y_pred), y_pred_avg, y_pred)
+#code to get predicted returns from the database and compare them to observed returns
         return y_pred_filled, y_true
 
 
@@ -243,38 +192,12 @@ class data():
     def get_dynamic_threshold_factor(self) -> float:
         y_pred, y_true = self.observed_returns()
         y_pred = y_pred[:-1]
-        errors = y_true - y_pred
-        rolling_mean = np.mean(errors[-self.window_size:], axis=0)
-
-        # Calculate threshold factor with variance denominator adjusted
-        variance = np.var(errors[-self.window_size:], axis=0)
-        threshold_factor = rolling_mean / (np.log(variance) + 1e-6)
-
-        # Adjust threshold factor based on the sign of the rolling mean
-        if np.sign(rolling_mean) != np.sign(self.trend_direction):
-            threshold_factor = -threshold_factor
+        #calculate threshold factor
 
         return threshold_factor
 
     def update_posterior(self, y):
-        # Calculate new posterior distribution using Bayesian updating
-        if self.trend_direction == 1:
-            mu_prior = self.mu_prior
-            sigma_prior = self.sigma_prior
-        elif self.trend_direction == -1:
-            mu_prior = -self.mu_prior
-            sigma_prior = self.sigma_prior
-        else:
-            mu_prior = 0
-            sigma_prior = self.sigma_prior
-
-        mu_posterior = (sigma_prior ** 2 * np.sum(y) + mu_prior * sigma_prior ** 2) / \
-                    (len(y) * sigma_prior ** 2 + 1 / sigma_prior ** 2)
-        sigma_posterior = np.sqrt(1 / (len(y) / sigma_prior ** 2 + 1 / sigma_prior ** 2))
-
-        # Update prior for next iteration
-        self.mu_prior = mu_posterior
-        self.sigma_prior = sigma_posterior
+#code to calculate mu_posterior and sigma_posterior
 
         return mu_posterior, sigma_posterior
 
@@ -285,12 +208,6 @@ class data():
         y_pred = y_pred[:-1]
         errors = y_pred - y_true
 
-        # Compute standard deviation of errors
-        errors_std = np.std(errors[-self.window_size:], axis=0)
-
-        # Set threshold_factor_std_dev based on the standard deviation of the errors
-        self.threshold_factor_std_dev = errors_std / (np.sqrt(np.var(errors[-self.window_size:], axis=0)) + 1e-6)
-
         # Adjust threshold based on standard deviation of errors
         threshold += self.threshold_factor_std_dev * errors_std
 
@@ -298,50 +215,7 @@ class data():
 
 
     def calculate_trend_direction(self, y_pred, y_true, mu_prior, sigma_prior):
-        # Define prior parameters for change point detection
-        prior_belief = np.ones(2)  # Uniform prior belief for 0 or 1 change points
-        prior_mean = np.zeros(2)   # Prior mean for the trend in each segment
-        prior_precision = np.ones(2)  # Prior precision (inverse variance) for the trend in each segment
-
-        # Define hyperparameters for prior distributions
-        prior_mean[1] = mu_prior
-        prior_precision[1] = 1 / (sigma_prior ** 2)
-
-        # Initialize variables for tracking change points
-        max_cp = 3  # Maximum number of change points to consider
-        max_lookback = min(self.window_size, len(y_pred))  # Maximum lookback window size
-
-        # Perform Bayesian change point detection
-        @lru_cache(maxsize=None)  # Memoization to speed up calculations
-        def run_bocpd(n, t):
-            if n == 0:
-                return prior_belief[0] * norm.pdf(y_pred[t], prior_mean[0], 1 / np.sqrt(prior_precision[0]))
-            else:
-                cp_likelihoods = []
-                for tau in range(max(0, t - max_lookback), t):
-                    cp_likelihood = norm.pdf(y_pred[t], prior_mean[1], 1 / np.sqrt(prior_precision[1]))
-                    cp_likelihood *= run_bocpd(n - 1, tau)
-                    cp_likelihoods.append(cp_likelihood)
-                return np.sum(cp_likelihoods)
-
-        # Compute posterior beliefs for each change point configuration
-        cp_posterior_beliefs = []
-        for n in range(max_cp):
-            cp_likelihoods = []
-            for t in range(n, len(y_pred)):
-                cp_likelihood = norm.pdf(y_pred[t], prior_mean[1], 1 / np.sqrt(prior_precision[1]))
-                cp_likelihood *= run_bocpd(n, t)
-                cp_likelihoods.append(cp_likelihood)
-            cp_posterior_beliefs.append(np.sum(cp_likelihoods))
-
-        # Determine trend direction based on maximum posterior belief
-        max_belief_index = np.argmax(cp_posterior_beliefs)
-        if max_belief_index % 2 == 1:
-            trend_direction = 1  # Positive trend
-        elif max_belief_index % 2 == 0:
-            trend_direction = -1  # Negative trend
-        else:
-            trend_direction = 0  # Neutral trend
+#calculate trend using bayesian updating
         return trend_direction
 
 
