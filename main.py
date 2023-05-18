@@ -22,6 +22,6 @@ def trade(i):
 
 
 if __name__ == '__main__':
-    trade('BTCUSDT')
+    trade('')
 
 
