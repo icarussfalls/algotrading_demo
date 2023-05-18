@@ -275,13 +275,4 @@ class Strategy():
         print(self.preds.calculate_rolling_average())
         time.sleep(20)
 
-
-
-#if __name__ == '__main__':
-    #y = Strategy('BTCUSDT')
-    #print(y.position())
-
-
-
-
     
