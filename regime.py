@@ -40,61 +40,7 @@ def my_auc_function(y_true, y_pred):
     return my_auc.result()
 
 class MyModel(tf.keras.Model):
-    def __init__(self, input_shape=(None,), hidden_units=[100, 120, 160, 200], dense_units=[64, 32, 16], dropout_rate=0.2, l2_lambda=1e-3):
-        super(MyModel, self).__init__()
-
-        self.hidden_units = hidden_units
-
-        # Define the input layer
-        self.input_layer = tf.keras.layers.InputLayer(input_shape=input_shape)
-
-        # Define the LSTM layers
-        self.lstm_layers = []
-        for i, unit in enumerate(hidden_units):
-            if i == 0:
-                lstm_layer = tf.keras.layers.LSTM(unit, return_sequences=True, dropout=dropout_rate, kernel_regularizer=l2(l2_lambda), kernel_initializer='glorot_uniform', input_shape=input_shape)
-            elif i == len(hidden_units)-1:
-                lstm_layer = tf.keras.layers.LSTM(unit, return_sequences=False, dropout=dropout_rate, kernel_regularizer=l2(l2_lambda), kernel_initializer='glorot_uniform')
-            else:
-                lstm_layer = tf.keras.layers.LSTM(unit, return_sequences=True, dropout=dropout_rate, kernel_regularizer=l2(l2_lambda), kernel_initializer='glorot_uniform')
-            self.lstm_layers.append(lstm_layer)
-
-        # Define the dense layers
-        self.dense_layers = []
-        for i, unit in enumerate(dense_units):
-            dense_layer = tf.keras.layers.Dense(unit, kernel_regularizer=l2(l2_lambda), kernel_initializer='glorot_uniform')
-            batch_norm_layer = tf.keras.layers.BatchNormalization()
-            activation_layer = tf.keras.layers.Activation('sigmoid')  # Use sigmoid activation function
-            dropout_layer = tf.keras.layers.Dropout(dropout_rate)
-            self.dense_layers.append(dense_layer)
-            self.dense_layers.append(batch_norm_layer)
-            self.dense_layers.append(activation_layer)
-            self.dense_layers.append(dropout_layer)
-
-        # Define the output layer
-        self.output_layer = tf.keras.layers.Dense(3, activation="softmax")
-
-    def call(self, inputs):
-        x = self.input_layer(inputs)
-
-        # Iterate through the LSTM layers
-        for i in range(0, len(self.lstm_layers)):
-            x = self.lstm_layers[i](x)
-
-        # Flatten the output from the LSTM layers
-        x = tf.keras.layers.Flatten()(x)
-
-        # Iterate through the dense layers
-        for i in range(0, len(self.dense_layers), 4):
-            x = self.dense_layers[i](x)
-            x = self.dense_layers[i+1](x)
-            x = self.dense_layers[i+2](x)
-            x = self.dense_layers[i+3](x)
-
-        # Apply the output layer
-        output = self.output_layer(x)
-
-        return output
+    #model used in the training process
     
 
 
@@ -174,43 +120,7 @@ class Regime_Detection():
 
         # Compute the autocorrelation of OHLCV changes for each partition
         ohlcv_acf = ohlcv_changes.map_partitions(compute_ohlcv_acf, window=window, lag=lag)
-
-        # Compute the rolling standard deviation of closing price changes for each partition
-        roll_std = ohlcv_changes['C_change'].rolling(window=window).std()
-
-        # Compute all the Dask tasks at once using the `dask.compute()` function
-        ohlcv_changes, ohlcv_stats, ohlcv_acf, roll_std = dd.compute(
-            ohlcv_changes, ohlcv_stats, ohlcv_acf, roll_std, 
-            scheduler='processes', num_workers=n_workers
-        )
-
-        # Concatenate all the computed Dask DataFrames together into a single DataFrame
-        df = dd.concat([df_dask, ohlcv_changes, ohlcv_stats, ohlcv_acf, roll_std], axis=1)
-
-        # Compute the final DataFrame by executing all Dask tasks and combining the results
-        df = df.compute(scheduler='processes', num_workers=n_workers)
-
-        # Initialize the 'regime' column with zeros
-        df['regime'] = 0
-
-        # Bull regime: check if OHLCV changes meet certain conditions
-        bull = (df['C_change_std'] > roll_std.mean()) & (df['C_change_skew'] > 0) & \
-            (df['C_change_kurt'] > 0) & (df['C_change_acorr_' + str(lag)] > ohlcv_acf['C_change_acorr_' + str(lag)].mean()) & \
-            (df['C_change_pacorr_' + str(lag)] > ohlcv_acf['C_change_pacorr_' + str(lag)].mean())
-
-        # Assign 'Bull' to the 'regime' column for the rows where 'bull' condition is true
-        df.loc[bull, 'regime'] = 1
-
-        # Bear regime: check if OHLCV changes meet certain conditions
-        bear = (df['C_change_std'] < roll_std.mean()) & (df['C_change_skew'] < 0) & \
-            (df['C_change_kurt'] < 0) & (df['C_change_acorr_' + str(lag)] < ohlcv_acf['C_change_acorr_' + str(lag)].mean()) & \
-            (df['C_change_pacorr_' + str(lag)] < ohlcv_acf['C_change_pacorr_' + str(lag)].mean())
-
-        # Assign 'Bear' to the 'regime' column for the rows where 'bear' condition is true
-        df.loc[bear, 'regime'] = -1
-        
-        # Drop all rows with NaN values
-        df.dropna(inplace=True)
+        #calculate and append regime to the dataframe
 
         # Transform the 'regime' column using the loaded label encoder
         path = json_data.get('encoder')
