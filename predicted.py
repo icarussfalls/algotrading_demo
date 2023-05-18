@@ -336,6 +336,3 @@ class data():
         while True:
             print(self.calculate_rolling_average())
             time.sleep(5)
-
-#y = data('BTCUSDT')
-#print(y.returns())
